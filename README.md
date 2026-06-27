@@ -26,7 +26,6 @@ pfSense punya 2 kaki (NIC):
 
 | Komponen | Nilai di project ini | Catatan |
 |----------|----------------------|---------|
-| Project GCP | `ics-ms-sandbox` | ganti sesuai punya Anda |
 | Zone | `asia-southeast2-b` | Jakarta |
 | WAN | network `vpc-untrust`, subnet `subnet-untrust-jkt` | dapat External IP |
 | LAN | network `vpc-workload`, subnet `subnet-workload-jkt` | `--no-address` |

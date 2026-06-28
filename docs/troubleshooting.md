@@ -146,6 +146,29 @@ Periksa berurutan:
 
 ---
 
+## H2. Instance di belakang LAN tidak dapat internet walau route + NAT sudah benar (GCP butuh LAN = DHCP)
+
+**Gejala:** Route `0.0.0.0/0 -> pfSense` sudah ada, Outbound NAT sudah cover subnet, GCP firewall sudah allow, tapi instance workload tetap **100% packet loss** ke internet. Dari pfSense, `ping <ip-instance-workload>` malah `sendto: Host is down`, dan `arp -an` menunjukkan entry **(incomplete)**.
+
+**Akar masalah (penting & tidak intuitif):** GCP adalah jaringan **L3 murni** — instance **tidak bisa saling ARP**. Semua komunikasi (termasuk antar-instance se-subnet) harus lewat **gateway subnet** (`.1`). Kalau interface LAN pfSense di-set **Static dengan netmask subnet (mis. /16)**, pfSense mengira seluruh subnet itu L2-langsung lalu meng-ARP tiap host → GCP tidak menjawab → ARP incomplete → balasan/return traffic tidak terkirim ke client.
+
+Cara cek dari shell pfSense:
+```sh
+netstat -rn | grep '10.1'      # akan terlihat: 10.1.0.0/16  link#2  U  vtnet1  (connected = salah utk GCP)
+arp -an | grep <ip-client>     # (incomplete) = ARP gagal
+ifconfig vtnet1 | grep inet    # netmask 0xffff0000 = /16 (penyebabnya)
+```
+
+**Solusi (paling simpel & terbukti):** Set interface **LAN ke DHCP**.
+- pfSense GUI: **Interfaces -> LAN -> IPv4 Configuration Type = DHCP -> Save -> Apply**.
+- GCP lalu memberi pfSense konfigurasi yang benar: IP `/32` + route ke gateway `.1`, sehingga semua traffic LAN dilewatkan ke gateway GCP (bukan ARP L2). Routing & return langsung jalan.
+
+> Prinsip umum: **di GCP, interface internal sebuah VM-router sebaiknya DHCP**, bukan static dengan netmask penuh. Ini berlaku untuk semua appliance (pfSense, MikroTik CHR, dll), bukan cuma pfSense.
+
+Jika tetap mau static: pakai netmask **/32**, tambahkan gateway non-local `.1` (System -> Routing -> Gateways, centang "Use non-local gateway"), lalu static route `subnet -> gateway .1`. Tapi DHCP jauh lebih simpel.
+
+---
+
 ## H. Perintah gcloud berisik karena neofetch (khusus environment ini)
 
 `~/.zshrc` menjalankan neofetch sehingga output gcloud penuh ASCII art. Hindari `source ~/.zshrc`. Tambahkan gcloud ke PATH langsung:

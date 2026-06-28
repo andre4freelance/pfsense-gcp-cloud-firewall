@@ -128,6 +128,27 @@ php -r 'require_once("config.inc"); $config["system"]["webgui"]["nohttprefererch
 
 ---
 
+## 5b. Memberi internet ke instance di belakang LAN (lewat pfSense)
+
+Supaya VM workload (tanpa External IP) bisa internet via pfSense:
+
+1. **VPC route** di `vpc-workload`: `0.0.0.0/0` → next-hop **instance pfSense**, **priority < 1000** (mis. 100) supaya menang atas route default internet-gateway GCP:
+   ```bash
+   gcloud compute routes create workload-to-pfsense --project=PROJECT \
+     --network=vpc-workload --destination-range=0.0.0.0/0 \
+     --next-hop-instance=pfsense --next-hop-instance-zone=ZONE --priority=100
+   ```
+2. **Firewall GCP** `vpc-workload`: izinkan ingress internal (agar pfSense bisa terima paket yang di-route):
+   ```bash
+   gcloud compute firewall-rules create workload-allow-internal --project=PROJECT \
+     --network=vpc-workload --direction=INGRESS --action=ALLOW \
+     --rules=all --source-ranges=10.0.0.0/8
+   ```
+3. **pfSense Outbound NAT**: Firewall → NAT → Outbound → mode **Automatic/Hybrid** (otomatis NAT subnet LAN).
+4. **pfSense LAN interface = DHCP** ⚠️ **PALING SERING TERLEWAT** — lihat `docs/troubleshooting.md` bagian **H2**. Static /16 bikin pfSense gagal ARP (GCP itu L3). **Interfaces → LAN → IPv4 = DHCP**.
+
+---
+
 ## 6. Isi Repo
 
 ```
